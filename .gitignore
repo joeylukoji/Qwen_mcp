@@ -1,0 +1,29 @@
+# Dossiers uploads
+uploads/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Fichiers Excel de test
+test_*.xlsx
+*.xls
+*.xlsx
+
+# Environnement virtuel
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.cursor/rules/snyk_rules.mdc

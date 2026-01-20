@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyse Excel - Système Multi-Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.19/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        .upload-area {
+            transition: all 0.3s ease;
+        }
+
+        .upload-area.dragover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+    </style>
+</head>
+
+<body class="bg-base-200 min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-base-content mb-2">Système d'Analyse Excel Multi-Agent</h1>
+            <p class="text-base-content/70">Analysez vos fichiers Excel avec intelligence artificielle</p>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="card bg-base-100 shadow-xl mb-6">
+            <div class="card-body">
+                <h2 class="card-title text-2xl mb-4">Téléverser un fichier Excel</h2>
+
+                <form id="uploadForm" class="space-y-4">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Type d'analyse</span>
+                        </label>
+                        <select name="type_analyse" id="typeAnalyse" class="select select-bordered w-full">
+                            <option value="auto">Détection automatique</option>
+                            <option value="students">Étudiants / Notes</option>
+                            <option value="entreprise">Données d'entreprise</option>
+                            <option value="palmares">Palmarès / Classements</option>
+                            <option value="generique">Analyse générique</option>
+                        </select>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Fichier Excel (.xlsx, .xls)</span>
+                        </label>
+                        <div id="uploadArea"
+                            class="upload-area border-2 border-dashed border-base-300 rounded-lg p-8 text-center cursor-pointer hover:border-primary">
+                            <input type="file" id="fileInput" name="file" accept=".xlsx,.xls" class="hidden" required>
+                            <div class="space-y-2">
+                                <svg class="mx-auto h-12 w-12 text-base-content/50" stroke="currentColor" fill="none"
+                                    viewBox="0 0 48 48">
+                                    <path
+                                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                                <p class="text-base-content/70">Cliquez pour sélectionner ou glissez-déposez votre
+                                    fichier</p>
+                                <p class="text-sm text-base-content/50" id="fileName"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="btn btn-primary w-full" disabled>
+                        <span id="submitText">Analyser le fichier</span>
+                        <span id="loadingSpinner" class="loading loading-spinner loading-sm hidden"></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" class="hidden">
+            <div class="card bg-base-100 shadow-xl mb-6">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">Résultats de l'analyse</h2>
+                    <div id="resultsContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chatbot Section -->
+        <div id="chatbotSection" class="hidden">
+            <div class="card bg-base-100 shadow-xl">
+                <div class="card-body">
+                    <h2 class="card-title text-2xl mb-4">Chatbot d'analyse</h2>
+                    <p class="text-sm text-base-content/70 mb-4">
+                        Posez des questions ou donnez des instructions sur le fichier Excel analysé.
+                        Le chatbot utilisera le LLM pour répondre en se basant sur les données du fichier.
+                    </p>
+
+                    <!-- Chat Messages -->
+                    <div id="chatMessages" class="bg-base-200 rounded-lg p-4 mb-4 h-96 overflow-y-auto space-y-4">
+                        <div class="chat-message chat-start">
+                            <div class="chat-bubble chat-bubble-info">
+                                <p>Bonjour ! Je suis votre assistant d'analyse Excel. Posez-moi des questions ou
+                                    donnez-moi des instructions sur le fichier que vous avez uploadé.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="form-control">
+                        <div class="input-group">
+                            <input type="text" id="chatInput" placeholder="Tapez votre message ou instruction..."
+                                class="input input-bordered w-full" />
+                            <button id="sendChatBtn" class="btn btn-primary">
+                                <span id="sendChatText">Envoyer</span>
+                                <span id="chatLoadingSpinner" class="loading loading-spinner loading-sm hidden"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Section -->
+        <div id="errorSection" class="hidden">
+            <div class="alert alert-error">
+                <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="errorMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const uploadForm = document.getElementById('uploadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultsSection = document.getElementById('resultsSection');
+        const resultsContent = document.getElementById('resultsContent');
+        const errorSection = document.getElementById('errorSection');
+        const errorMessage = document.getElementById('errorMessage');
+        const chatbotSection = document.getElementById('chatbotSection');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendChatBtn = document.getElementById('sendChatBtn');
+        const sendChatText = document.getElementById('sendChatText');
+        const chatLoadingSpinner = document.getElementById('chatLoadingSpinner');
+
+        let currentFichierPath = null;
+
+        // Gestion du drag & drop
+        uploadArea.addEventListener('click', () => fileInput.click());
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                updateFileName();
+            }
+        });
+
+        fileInput.addEventListener('change', updateFileName);
+
+        function updateFileName() {
+            if (fileInput.files.length > 0) {
+                fileName.textContent = fileInput.files[0].name;
+                submitBtn.disabled = false;
+            } else {
+                fileName.textContent = '';
+                submitBtn.disabled = true;
+            }
+        }
+
+        // Soumission du formulaire
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const formData = new FormData(uploadForm);
+            const typeAnalyse = formData.get('type_analyse');
+
+            if (!fileInput.files.length) {
+                showError('Veuillez sélectionner un fichier');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitText.textContent = 'Analyse en cours...';
+            loadingSpinner.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            errorSection.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.erreur) {
+                    showError(data.erreur || 'Erreur lors de l\'analyse');
+                    return;
+                }
+
+                displayResults(data);
+
+                // Afficher le chatbot après l'analyse
+                chatbotSection.classList.remove('hidden');
+                // Stocker le chemin du fichier depuis la réponse du serveur
+                currentFichierPath = data.fichier_path || null;
+            } catch (error) {
+                showError('Erreur de connexion: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = 'Analyser le fichier';
+                loadingSpinner.classList.add('hidden');
+            }
+        });
+
+        // Gestion du chatbot
+        function addChatMessage(message, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'chat-end' : 'chat-start'}`;
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = `chat-bubble ${isUser ? 'chat-bubble-primary' : 'chat-bubble-info'}`;
+            bubbleDiv.innerHTML = `<p class="whitespace-pre-wrap">${message}</p>`;
+
+            messageDiv.appendChild(bubbleDiv);
+            chatMessages.appendChild(messageDiv);
+
+            // Scroll vers le bas
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendChatMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            // Afficher le message de l'utilisateur
+            addChatMessage(message, true);
+            chatInput.value = '';
+
+            // Désactiver le bouton et afficher le loading
+            sendChatBtn.disabled = true;
+            sendChatText.textContent = 'Envoi...';
+            chatLoadingSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/chatbot', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        fichier_path: currentFichierPath
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || data.erreur) {
+                    addChatMessage(`Erreur: ${data.erreur || 'Erreur inconnue'}`, false);
+                } else {
+                    addChatMessage(data.reponse, false);
+                }
+            } catch (error) {
+                addChatMessage(`Erreur de connexion: ${error.message}`, false);
+            } finally {
+                sendChatBtn.disabled = false;
+                sendChatText.textContent = 'Envoyer';
+                chatLoadingSpinner.classList.add('hidden');
+            }
+        }
+
+        // Envoyer avec le bouton
+        sendChatBtn.addEventListener('click', sendChatMessage);
+
+        // Envoyer avec Enter
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChatMessage();
+            }
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorSection.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+        }
+
+        function displayResults(data) {
+            errorSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+
+            // Afficher le résumé généré par le LLM
+            let html = '';
+
+            if (data.resume) {
+                html = `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Résumé du fichier</h3>
+                        <div class="card bg-base-200">
+                            <div class="card-body">
+                                <div class="whitespace-pre-wrap">${data.resume}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (data.statistiques) {
+                const stats = data.statistiques;
+                html += `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Statistiques</h3>
+                        <div class="stats shadow">
+                            <div class="stat">
+                                <div class="stat-title">Nombre de lignes</div>
+                                <div class="stat-value text-primary">${stats.nombre_lignes || 0}</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-title">Nombre de colonnes</div>
+                                <div class="stat-value">${stats.nombre_colonnes || 0}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                if (stats.colonnes && stats.colonnes.length > 0) {
+                    html += `
+                        <div class="mb-6">
+                            <h3 class="text-xl font-semibold mb-4">Colonnes</h3>
+                            <div class="flex flex-wrap gap-2">
+                                ${stats.colonnes.map(col => `<span class="badge badge-outline">${col}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            resultsContent.innerHTML = html;
+        }
+
+        function displayStudentsResults(data) {
+            const stats = data.statistiques || {};
+            const analyses = data.analyses || [];
+
+            let html = `
+                <div class="stats shadow mb-6">
+                    <div class="stat">
+                        <div class="stat-title">Total étudiants</div>
+                        <div class="stat-value text-primary">${stats.total || 0}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Admis</div>
+                        <div class="stat-value text-success">${stats.admis || 0}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Échec</div>
+                        <div class="stat-value text-error">${stats.echec || 0}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Moyenne générale</div>
+                        <div class="stat-value">${stats.moyenne_generale || 0}</div>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra">
+                        <thead>
+                            <tr>
+                                <th>Nom</th>
+                                <th>Classe</th>
+                                <th>Moyenne</th>
+                                <th>Statut</th>
+                                <th>Observation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+
+            analyses.forEach(analyse => {
+                const student = analyse.student || {};
+                const analyseData = analyse.analyse || {};
+                html += `
+                    <tr>
+                        <td class="font-medium">${student.nom || 'N/A'}</td>
+                        <td>${student.classe || 'N/A'}</td>
+                        <td class="text-center">${analyseData.moyenne !== null && analyseData.moyenne !== undefined ? analyseData.moyenne.toFixed(2) : 'N/A'}</td>
+                        <td>
+                            <span class="badge ${analyseData.statut === 'Admis' ? 'badge-success' : 'badge-error'}">
+                                ${analyseData.statut || 'N/A'}
+                            </span>
+                        </td>
+                        <td class="max-w-md">${analyseData.observation || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function displayEntrepriseResults(data) {
+            const stats = data.statistiques || {};
+            const resume = stats.resume || {};
+
+            let html = `
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Résumé statistique</h3>
+                    <div class="stats shadow">
+                        <div class="stat">
+                            <div class="stat-title">Total lignes</div>
+                            <div class="stat-value">${stats.total_lignes || 0}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Colonnes</div>
+                            <div class="stat-value">${stats.colonnes?.length || 0}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Statistiques par colonne</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra">
+                            <thead>
+                                <tr>
+                                    <th>Colonne</th>
+                                    <th>Moyenne</th>
+                                    <th>Minimum</th>
+                                    <th>Maximum</th>
+                                    <th>Somme</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+            Object.entries(resume).forEach(([col, stats]) => {
+                html += `
+                    <tr>
+                        <td>${col}</td>
+                        <td>${stats.moyenne?.toFixed(2) || 'N/A'}</td>
+                        <td>${stats.min?.toFixed(2) || 'N/A'}</td>
+                        <td>${stats.max?.toFixed(2) || 'N/A'}</td>
+                        <td>${stats.somme?.toFixed(2) || 'N/A'}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function displayPalmaresResults(data) {
+            const stats = data.statistiques || {};
+            const top3 = stats.top_3 || [];
+
+            let html = `
+                <div class="stats shadow mb-6">
+                    <div class="stat">
+                        <div class="stat-title">Total participants</div>
+                        <div class="stat-value text-primary">${stats.total_participants || 0}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Meilleur score</div>
+                        <div class="stat-value text-success">${stats.meilleur_score || 'N/A'}</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Score moyen</div>
+                        <div class="stat-value">${stats.score_moyen?.toFixed(2) || 'N/A'}</div>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Top 3</h3>
+                    <div class="space-y-2">
+            `;
+
+            top3.forEach((item, index) => {
+                html += `
+                    <div class="card bg-base-200">
+                        <div class="card-body">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="badge badge-primary badge-lg">${index + 1}</span>
+                                    <span class="ml-2">${JSON.stringify(item)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function displayGenericResults(data) {
+            const resume = data.resume || {};
+
+            return `
+                <div class="mb-6">
+                    <h3 class="text-xl font-semibold mb-4">Résumé</h3>
+                    <div class="stats shadow">
+                        <div class="stat">
+                            <div class="stat-title">Colonnes</div>
+                            <div class="stat-value">${resume.colonnes?.length || 0}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Lignes</div>
+                            <div class="stat-value">${resume.nombre_lignes || 0}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <span>Fichier analysé avec succès. Les données sont disponibles dans le format JSON.</span>
+                </div>
+            `;
+        }
+    </script>
+</body>
+
+</html>
