@@ -16,11 +16,6 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 try:
-    import httpx
-    HTTPX_AVAILABLE = True
-except ImportError:
-    HTTPX_AVAILABLE = False
-try:
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
     from mcp.types import Tool, TextContent
@@ -39,41 +34,6 @@ if MCP_AVAILABLE:
     app = Server("excel-analyzer")
 else:
     app = None
-
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/v1/chat/completions")
-OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "120"))
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
-
-MASTER_PROMPT = """### RÔLE
-Tu es un Système Multi-Agent d'Encodage Administratif. Ton objectif est de transformer des données brutes (extraites d'Excel) en documents JSON structurés et en analyses décisionnelles pour une administration scolaire.
-
-### MISSIONS
-1. **TRANSCRIPTION :** Convertir les données textuelles en format JSON strict.
-2. **CALCUL :** CALCULER la moyenne des notes (somme des notes divisée par le nombre de notes valides). Exclure les valeurs null.
-3. **ANALYSE :** Évaluer les performances selon les critères suivants :
-   - Moyenne 
-   - Si Absences 
-4. **RÉDACTION :** Générer une observation formelle pour le bulletin.
-
-### FORMAT DE SORTIE OBLIGATOIRE (JSON)
-Tu dois impérativement répondre sous ce format JSON, sans texte superflu :
-{
-  "student": { "nom": "", "classe": "" },
-  "notes": { "matiere": note },
-  "analyse": {
-    "moyenne": float,
-    "statut": "Admis" | "Échec",
-    "observation": "Texte formel"
-  }
-}
-
-### RÈGLES CRITIQUES
-- CALCULER la moyenne : additionner toutes les notes numériques (ignorer null), puis diviser par le nombre de notes valides.
-- Ne jamais inventer de données.
-- Si une note est illisible, mets "null" dans les notes, mais ne l'inclus PAS dans le calcul de la moyenne.
-- Le statut "Admis" si moyenne >= 10, "Échec" si moyenne < 10.
-- Utilise un ton administratif froid et professionnel."""
-
 
 def detecter_ligne_en_tete(chemin_fichier: Path, feuille: Optional[str] = None, max_lignes: int = 5) -> int:
     """
@@ -116,7 +76,6 @@ def nettoyer_nan_recursif(obj):
         if obj != obj:
             return None
     return obj
-
 
 
 def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
@@ -171,54 +130,6 @@ def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
     except Exception as e:
         logging.error(f"Erreur dans convertir_excel_en_json: {e}", exc_info=True)
         raise ValueError(f"Erreur lors de la lecture du fichier Excel: {str(e)}")
-   
-
-async def appeler_ollama(donnees_brutes: Dict[str, Any], url: Optional[str] = None, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
-    """Envoie les données brutes au LLM via Ollama et récupère l'analyse."""
-    if not HTTPX_AVAILABLE:
-        raise ImportError("httpx n'est pas installé. Installez-le avec: pip install httpx")
-    api_url = url or OLLAMA_URL
-    message_utilisateur = f"""Analyse les données suivantes extraites d'un fichier Excel et génère le JSON structuré selon le format requis :
-
-{json.dumps(donnees_brutes, ensure_ascii=False, indent=2)}
-"""
-    system_prompt = custom_prompt if custom_prompt else MASTER_PROMPT
-
-    payload = {
-        "model": OLLAMA_MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": message_utilisateur}
-        ],
-        "temperature": 0.1,  
-        "stream": False  
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-            response = await client.post(api_url, json=payload)
-            response.raise_for_status()
-
-            result = response.json()
-            if "choices" in result and len(result["choices"]) > 0:
-                content = result["choices"][0]["message"]["content"]
-                try:
-                    content_clean = content.strip()
-                    if content_clean.startswith("```json"):
-                        lines = content_clean.split("\n")
-                        content_clean = "\n".join(lines[1:-1]) if len(lines) > 2 else content_clean
-
-                    return json.loads(content_clean)
-                except json.JSONDecodeError:
-                    raise ValueError(f"Le LLM n'a pas retourné un JSON valide. Réponse: {content}")
-            else:
-                raise ValueError("Réponse invalide de Ollama")
-
-    except httpx.RequestError as e:
-        raise ConnectionError(f"Impossible de se connecter à Ollama à {api_url}. Assurez-vous que Ollama est démarré et que l'API est activée. Erreur: {str(e)}")
-    except httpx.HTTPStatusError as e:
-        error_details = e.response.text
-        raise ConnectionError(f"Erreur HTTP {e.response.status_code} de Ollama: {error_details}\n\nVérifiez que:\n1. Ollama est démarré\n2. Le modèle '{OLLAMA_MODEL}' est chargé\n3. L'API est activée dans Ollama")
 
 
 if MCP_AVAILABLE and app:
