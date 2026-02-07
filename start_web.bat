@@ -12,7 +12,7 @@ if errorlevel 1 (
 
 REM Installer les dependances si necessaire
 echo [1/2] Verification des dependances...
-pip install flask werkzeug >nul 2>&1
+pip install -r requirements.txt >nul 2>&1
 
 echo.
 echo [2/2] Demarrage du serveur web...

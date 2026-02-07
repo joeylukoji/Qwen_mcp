@@ -90,9 +90,10 @@
             <div class="card bg-base-100 shadow-xl">
                 <div class="card-body">
                     <h2 class="card-title text-2xl mb-4">Chatbot d'analyse</h2>
+                    <p id="chatbotFichierInfo" class="text-sm font-medium text-primary mb-2 hidden">Fichier utilisé : <span id="chatbotFichierNom"></span></p>
                     <p class="text-sm text-base-content/70 mb-4">
                         Posez des questions ou donnez des instructions sur le fichier Excel analysé.
-                        Le chatbot utilisera le LLM pour répondre en se basant sur les données du fichier.
+                        Posez n'importe quelle question sur les données : résumé, filtres (ex. qui est en promotion X), comparaisons, etc. Si Ollama est installé localement, un LLM répond à vos questions ouvertes.
                     </p>
 
                     <!-- Chat Messages -->
@@ -208,7 +209,14 @@
                     body: formData
                 });
 
-                const data = await response.json();
+                const contentType = response.headers.get('Content-Type') || '';
+                let data;
+                try {
+                    data = contentType.includes('application/json') ? await response.json() : {};
+                } catch (_) {
+                    showError('Le serveur a renvoyé une réponse invalide. Vérifiez que l\'API est disponible.');
+                    return;
+                }
 
                 if (!response.ok || data.erreur) {
                     showError(data.erreur || 'Erreur lors de l\'analyse');
@@ -219,10 +227,18 @@
 
                 // Afficher le chatbot après l'analyse
                 chatbotSection.classList.remove('hidden');
-                // Stocker le chemin du fichier depuis la réponse du serveur
-                currentFichierPath = data.fichier_path || null;
+                // Stocker le chemin du fichier depuis la réponse du serveur (toujours une chaîne)
+                currentFichierPath = (data.fichier_path != null && data.fichier_path !== '') ? String(data.fichier_path) : null;
+                const fichierInfo = document.getElementById('chatbotFichierInfo');
+                const fichierNom = document.getElementById('chatbotFichierNom');
+                if (currentFichierPath && fichierNom) {
+                    fichierNom.textContent = data.filename || currentFichierPath.replace(/^.*[/\\]/, '');
+                    fichierInfo.classList.remove('hidden');
+                } else if (fichierInfo) {
+                    fichierInfo.classList.add('hidden');
+                }
             } catch (error) {
-                showError('Erreur de connexion: ' + error.message);
+                showError('Erreur de connexion: ' + (error.message || 'Vérifiez que le serveur est démarré.'));
             } finally {
                 submitBtn.disabled = false;
                 submitText.textContent = 'Analyser le fichier';
@@ -267,11 +283,18 @@
                     },
                     body: JSON.stringify({
                         message: message,
-                        fichier_path: currentFichierPath
+                        fichier_path: currentFichierPath != null ? String(currentFichierPath) : null
                     })
                 });
 
-                const data = await response.json();
+                const contentType = response.headers.get('Content-Type') || '';
+                let data;
+                try {
+                    data = contentType.includes('application/json') ? await response.json() : { erreur: 'Réponse invalide du serveur' };
+                } catch (_) {
+                    addChatMessage('Erreur: le serveur a renvoyé une réponse invalide (vérifiez que l\'API est disponible).', false);
+                    return;
+                }
 
                 if (!response.ok || data.erreur) {
                     addChatMessage(`Erreur: ${data.erreur || 'Erreur inconnue'}`, false);
@@ -279,7 +302,7 @@
                     addChatMessage(data.reponse, false);
                 }
             } catch (error) {
-                addChatMessage(`Erreur de connexion: ${error.message}`, false);
+                addChatMessage('Erreur de connexion: ' + (error.message || 'Vérifiez que le serveur est démarré.'), false);
             } finally {
                 sendChatBtn.disabled = false;
                 sendChatText.textContent = 'Envoyer';

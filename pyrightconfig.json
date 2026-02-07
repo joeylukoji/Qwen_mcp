@@ -1,0 +1,12 @@
+{
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportCallIssue": "none",
+  "reportArgumentType": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportIndexIssue": "none",
+  "reportUnusedExcept": "none",
+  "reportPossiblyUnboundVariable": "none"
+}

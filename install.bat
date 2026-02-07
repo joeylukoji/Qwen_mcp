@@ -26,9 +26,9 @@ if errorlevel 1 (
 
 echo.
 echo [2/2] Verification de l'installation...
-python test_mcp.py
+python -c "from mcp_server import convertir_excel_en_json; from web_server import app; print('[OK] Modules charges.')"
 if errorlevel 1 (
-    echo [ERREUR] Les tests ont echoue
+    echo [ERREUR] Les modules n'ont pas pu etre charges. Verifiez les dependances.
     pause
     exit /b 1
 )

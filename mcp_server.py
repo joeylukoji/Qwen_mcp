@@ -10,6 +10,7 @@ import sys
 import os
 from typing import Any, Dict, List, Optional
 from pathlib import Path
+import numpy as np
 import pandas as pd
 
 # Configuration du logging
@@ -23,12 +24,15 @@ try:
 except ImportError:
     MCP_AVAILABLE = False
     class Server:
-        def __init__(self, name):
-            self.name = name
+        def __init__(self, name: str) -> None: ...
+        def list_tools(self): ...
+        def call_tool(self): ...
+        def run(self, *args: Any, **kwargs: Any): ...
+        def create_initialization_options(self): ...
     class Tool:
-        pass
+        def __init__(self, *, name: str = "", description: str = "", inputSchema: Any = None) -> None: ...
     class TextContent:
-        pass
+        def __init__(self, *, type: str = "", text: str = "") -> None: ...
 
 if MCP_AVAILABLE:
     app = Server("excel-analyzer")
@@ -78,6 +82,32 @@ def nettoyer_nan_recursif(obj):
     return obj
 
 
+def _nettoyer_types_pour_json(obj: Any) -> Any:
+    """
+    Convertit récursivement les types numpy/pandas en types Python natifs
+    pour une sérialisation JSON correcte (int reste int, float reste float).
+    """
+    if isinstance(obj, dict):
+        return {k: _nettoyer_types_pour_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_nettoyer_types_pour_json(i) for i in obj]
+    if pd.isna(obj):
+        return None
+    if hasattr(obj, "item"):  # numpy scalar (int, float, bool)
+        return obj.item()
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj) if not (obj != obj) else None
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    if hasattr(obj, "isoformat"):  # pd.Timestamp, datetime
+        return obj.isoformat()
+    return obj
+
+
 def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
                             inclure_index: bool = False, header_row: Optional[int] = None) -> Dict[str, Any]:
     """
@@ -100,7 +130,7 @@ def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
             resultat = {
                 "feuille": feuille,
                 "ligne_en_tete": header_row,
-                "colonnes": df.columns.tolist(),
+                "colonnes": list(df.columns),
                 "nombre_lignes": len(df),
                 "lignes": lignes_nettoyees if isinstance(lignes_nettoyees, list) else [lignes_nettoyees]
             }
@@ -120,7 +150,7 @@ def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
 
                 resultat["donnees"][sheet_name] = {
                     "ligne_en_tete": sheet_header_row,
-                    "colonnes": df.columns.tolist(),
+                    "colonnes": list(df.columns),
                     "nombre_lignes": len(df),
                     "lignes": lignes_nettoyees if isinstance(lignes_nettoyees, list) else [lignes_nettoyees]
                 }
@@ -133,7 +163,7 @@ def convertir_excel_en_json(chemin_fichier: Path, feuille: Optional[str] = None,
 
 
 if MCP_AVAILABLE and app:
-    @app.list_tools()
+    @app.list_tools()  # type: ignore[union-attr]
     async def list_tools() -> List[Tool]:
         """Liste les outils disponibles."""
         return [
@@ -160,7 +190,7 @@ if MCP_AVAILABLE and app:
 
 
 if MCP_AVAILABLE and app:
-    @app.call_tool()
+    @app.call_tool()  # type: ignore[union-attr]
     async def call_tool(name: str, arguments: Dict[str, Any]) -> List[TextContent]:
         """Exécute les outils disponibles."""
 
@@ -175,6 +205,7 @@ if MCP_AVAILABLE and app:
             try:
                 feuille = arguments.get("feuille")
                 resultat = convertir_excel_en_json(chemin, feuille)
+                resultat = _nettoyer_types_pour_json(resultat)
 
                 return [TextContent(
                     type="text",
@@ -198,8 +229,9 @@ async def main():
     if not MCP_AVAILABLE:
         print("Erreur: Le module MCP n'est pas installé. Installez-le avec: pip install mcp")
         sys.exit(1)
-    async with stdio_server() as (read_stream, write_stream):
-        await app.run(read_stream, write_stream, app.create_initialization_options())
+    from mcp.server.stdio import stdio_server as _stdio_server
+    async with _stdio_server() as (read_stream, write_stream):
+        await app.run(read_stream, write_stream, app.create_initialization_options())  # type: ignore[union-attr]
 
 
 if __name__ == "__main__":
