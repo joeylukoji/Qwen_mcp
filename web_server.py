@@ -634,4 +634,7 @@ def health_check():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Debug mode and network exposure are opt-in: the Werkzeug debugger allows remote code execution.
+    app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1",
+            host=os.getenv("HOST", "127.0.0.1"),
+            port=int(os.getenv("PORT", "5000")))
