@@ -152,6 +152,9 @@ All settings are environment variables:
 | `BATCH_SIZE` | `20` | Rows per chunk in the batch processor |
 | `ENABLE_LLM` | `1` | `0` disables LLM calls (local summaries only) |
 | `LLM_COOLDOWN_SECONDS` | `60` | Pause before retrying the LLM after a failure |
+| `HOST` | `127.0.0.1` | Web server bind address |
+| `PORT` | `5000` | Web server port |
+| `FLASK_DEBUG` | `0` | `1` enables Flask debug mode (development only) |
 
 Because the endpoint is OpenAI-compatible, you can point `OLLAMA_URL` to LM Studio or any compatible server and switch models with `OLLAMA_MODEL`.
 
@@ -181,7 +184,7 @@ python test_fichier_generique.py
 
 ## ⚠️ Notes
 
-- The Flask server runs in **debug mode on `0.0.0.0`**: use it on a local machine or a trusted network only.
+- The web server listens on `127.0.0.1` with debug off by default. Set `HOST=0.0.0.0` to expose it on your network, and never enable `FLASK_DEBUG=1` outside development.
 - Spreadsheets may contain personal data (student grades). `uploads/` and Excel files are already in `.gitignore`.
 - `inserer_en_base_par_lots` in `batch_processor.py` is a stub to adapt to your database.
 
