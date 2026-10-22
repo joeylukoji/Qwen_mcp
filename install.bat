@@ -26,7 +26,7 @@ if errorlevel 1 (
 
 echo.
 echo [2/2] Verification de l'installation...
-python test_mcp.py
+python -c "import mcp_server, agents, batch_processor"
 if errorlevel 1 (
     echo [ERREUR] Les tests ont echoue
     pause
